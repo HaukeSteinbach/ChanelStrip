@@ -113,8 +113,9 @@ private:
         Channel               channels[kMaxChannels];
     };
 
-    int     fd_   { -1      };
-    Layout* data_ { nullptr };
+    int     fd_            { -1      };
+    void*   mappingHandle_ { nullptr };
+    Layout* data_          { nullptr };
 
     bool openMapping();
     void closeMapping();
