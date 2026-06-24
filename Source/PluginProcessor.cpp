@@ -12,42 +12,32 @@ SteinbachChanelStripAudioProcessor::createParameterLayout()
     using namespace juce;
     std::vector<std::unique_ptr<RangedAudioParameter>> params;
 
-    // ── EQ ───────────────────────────────────────────────────────────────────
+    // ── EQ (3 Knobs, kubische Antwortkurve ±12 dB) ───────────────────────────
     params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::HPF_ENABLED, "HPF 40 Hz", false));
+        ParamID::HPF_ENABLED, "HPF 40 Hz", true));
+
+    // Kubische NormalisableRange: subtil in der Mitte, exponentiell an den Rändern
+    auto makeEQRange = []() -> NormalisableRange<float> {
+        return NormalisableRange<float>(
+            -12.0f, 12.0f,
+            [](float, float, float v) -> float {
+                const float t = v * 2.0f - 1.0f;       // [0,1] → [-1,1]
+                return t * t * t * 12.0f;               // kubisch → [-12,12] dB
+            },
+            [](float, float, float dB) -> float {
+                const float t = std::cbrt(dB / 12.0f); // Umkehrung Kubik
+                return (t + 1.0f) * 0.5f;              // → [0,1]
+            });
+    };
 
     params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::LS_FREQ, "Low Shelf Freq",
-        NormalisableRange<float>(20.0f, 600.0f, 1.0f, 0.4f), 80.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-
-    params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::LS_GAIN, "Low Shelf Gain",
-        NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f,
+        ParamID::EQ_LOW,  "Low  (100 Hz)",  makeEQRange(), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
-
     params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::MID_FREQ, "Mid Freq",
-        NormalisableRange<float>(200.0f, 8000.0f, 1.0f, 0.4f), 1000.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-
-    params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::MID_GAIN, "Mid Gain",
-        NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f,
+        ParamID::EQ_MID,  "Mid  (1 kHz)",   makeEQRange(), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
-
     params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::MID_Q, "Mid Q",
-        NormalisableRange<float>(0.1f, 10.0f, 0.01f, 0.5f), 0.707f));
-
-    params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::HS_FREQ, "High Shelf Freq",
-        NormalisableRange<float>(2000.0f, 20000.0f, 1.0f, 0.4f), 8000.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-
-    params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::HS_GAIN, "High Shelf Gain",
-        NormalisableRange<float>(-12.0f, 12.0f, 0.1f), 0.0f,
+        ParamID::EQ_HIGH, "High (10 kHz)",  makeEQRange(), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
 
     // ── Routing ──────────────────────────────────────────────────────────────
@@ -62,21 +52,21 @@ SteinbachChanelStripAudioProcessor::createParameterLayout()
         AudioParameterFloatAttributes().withLabel("dB")));
 
     params.push_back(std::make_unique<AudioParameterFloat>(
-        ParamID::MORPH_AMOUNT, "Wavefolding",
+        ParamID::MORPH_AMOUNT, "Character",
         NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
     params.push_back(std::make_unique<AudioParameterInt>(
-        ParamID::WAVETABLE_IDX, "Wavetable", 0, WavetableManager::kMaxPresets - 1, 0));
+        ParamID::WAVETABLE_IDX, "Wavetable", 0, 2, 0));  // 3 Sine-Presets
 
     params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::LR_LINK, "L/R Link Variation", true));
+        ParamID::LR_LINK, "L/R Link", true));
 
-    // ── Console Mode ─────────────────────────────────────────────────────────
+    // ── Console Mode (4 Gruppen: 0–3) ────────────────────────────────────────
     params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::CONSOLE_ENABLE, "Analog Console Mode", false));
+        ParamID::CONSOLE_ENABLE, "Console Mode", false));
 
     params.push_back(std::make_unique<AudioParameterInt>(
-        ParamID::CONSOLE_GROUP, "Console Group", 0, 7, 0));
+        ParamID::CONSOLE_GROUP, "Console Group", 0, 3, 0));
 
     return { params.begin(), params.end() };
 }
@@ -88,24 +78,65 @@ SteinbachChanelStripAudioProcessor::SteinbachChanelStripAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    // Per-Instanz-Variation: L und R bekommen verschiedene zufällige Abweichungen
-    std::mt19937 rng(std::random_device{}());
-    std::uniform_real_distribution<float> dist(0.01f, 0.05f); // 1..5 %
-    variationL = dist(rng);
-    variationR = dist(rng);
+    // Per-Instanz-Variation: analog console character
+    // Jede Plugin-Instanz bekommt zufällige, unabhängige L/R-Charakteristika.
+    // Link ON → L=R (Differenz aufgehoben).
+    {
+        std::mt19937 rng(std::random_device{}());
+
+        // Gain-Variation ±0.6 dB pro Kanal → sichtbares Stereo-Image
+        // σ = 0.3 dB: 68 % innerhalb ±0.3 dB, 95 % innerhalb ±0.6 dB
+        std::normal_distribution<float> gainDist(0.0f, 0.55f);
+        gainVarDbL = std::clamp(static_cast<float>(gainDist(rng)), -1.5f, 1.5f);
+        gainVarDbR = std::clamp(static_cast<float>(gainDist(rng)), -1.5f, 1.5f);
+
+        // Asymmetrie-Variation ±5 % → unterschiedliche 2nd-Harmonic-Kurven L vs R
+        // DC-kompensiert im hot path, kein Offset auf dem Output
+        std::uniform_real_distribution<float> asymDist(-0.15f, 0.15f);
+        asymVarL = asymDist(rng);
+        asymVarR = asymDist(rng);
+
+        // variationL/R: kleine Werte für WavetableManager (kein Einfluss auf hot path)
+        std::uniform_real_distribution<float> varDist(0.01f, 0.03f);
+        variationL = varDist(rng);
+        variationR = varDist(rng);
+    }
+
+    // Shared-Memory-Kanal reservieren (einmalig, non-RT)
+    if (shmBlock.isValid())
+        shmChannel = shmBlock.acquireChannel("CH");
 }
 
 SteinbachChanelStripAudioProcessor::~SteinbachChanelStripAudioProcessor()
 {
-    // Slot freigeben – außerhalb des Audio-Threads, daher sicher
+    // Slots freigeben – außerhalb des Audio-Threads, daher sicher
     if (instanceSlot >= 0)
         InstanceRegistry::getInstance().releaseSlot(instanceSlot);
+    if (shmChannel >= 0)
+        shmBlock.releaseChannel(shmChannel);
+}
+
+void SteinbachChanelStripAudioProcessor::setChannelDisplayName(const juce::String& n)
+{
+    channelName = n;
+    if (shmChannel >= 0)
+        shmBlock.writeName(shmChannel, n.toRawUTF8());
+}
+
+void SteinbachChanelStripAudioProcessor::updateTrackProperties(const TrackProperties& props)
+{
+    if (props.name.has_value() && !props.name->isEmpty())
+        setChannelDisplayName(*props.name);
 }
 
 // ── prepareToPlay ─────────────────────────────────────────────────────────────
 void SteinbachChanelStripAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     eqProcessor.prepare(sampleRate, samplesPerBlock);
+
+    // Oversampling initialisieren; Latenz dem Host melden (→ PDC)
+    oversampling.initProcessing(static_cast<std::size_t>(samplesPerBlock));
+    setLatencySamples(static_cast<int>(oversampling.getLatencyInSamples()));
 
     // Wavetable-Variation einmalig anwenden
     wavetableManagerL.loadPreset(0);
@@ -154,79 +185,151 @@ void SteinbachChanelStripAudioProcessor::processBlock(
         buffer.clear(ch, 0, numSamples);
 
     // ── Parameter lesen (einmal pro Block) ───────────────────────────────────
-    const bool  hpfEnabled   = *apvts.getRawParameterValue(ParamID::HPF_ENABLED) > 0.5f;
-    const float lsFreq       = *apvts.getRawParameterValue(ParamID::LS_FREQ);
-    const float lsGain       = *apvts.getRawParameterValue(ParamID::LS_GAIN);
-    const float midFreq      = *apvts.getRawParameterValue(ParamID::MID_FREQ);
-    const float midGain      = *apvts.getRawParameterValue(ParamID::MID_GAIN);
-    const float midQ         = *apvts.getRawParameterValue(ParamID::MID_Q);
-    const float hsFreq       = *apvts.getRawParameterValue(ParamID::HS_FREQ);
-    const float hsGain       = *apvts.getRawParameterValue(ParamID::HS_GAIN);
-    const float pan          = *apvts.getRawParameterValue(ParamID::PAN);
-    const float preampGainDb = *apvts.getRawParameterValue(ParamID::PREAMP_GAIN);
-    const float morphAmount  = *apvts.getRawParameterValue(ParamID::MORPH_AMOUNT);
+    bool  hpfEnabled   = *apvts.getRawParameterValue(ParamID::HPF_ENABLED) > 0.5f;
+    float eqLow        = *apvts.getRawParameterValue(ParamID::EQ_LOW);
+    float eqMid        = *apvts.getRawParameterValue(ParamID::EQ_MID);
+    float eqHigh       = *apvts.getRawParameterValue(ParamID::EQ_HIGH);
+    float pan          = *apvts.getRawParameterValue(ParamID::PAN);
+    float preampGainDb = *apvts.getRawParameterValue(ParamID::PREAMP_GAIN);
+    float morphAmount  = *apvts.getRawParameterValue(ParamID::MORPH_AMOUNT);
+    int   wavetableIdx = static_cast<int>(*apvts.getRawParameterValue(ParamID::WAVETABLE_IDX));
     const bool  lrLink       = *apvts.getRawParameterValue(ParamID::LR_LINK) > 0.5f;
     const bool  consoleOn    = *apvts.getRawParameterValue(ParamID::CONSOLE_ENABLE) > 0.5f;
     const int   consoleGroup = static_cast<int>(*apvts.getRawParameterValue(ParamID::CONSOLE_GROUP));
 
     // ── EQ ───────────────────────────────────────────────────────────────────
-    eqProcessor.setParameters(hpfEnabled,
-                               lsFreq, lsGain,
-                               midFreq, midGain, midQ,
-                               hsFreq, hsGain);
+    // ── Shared-Memory: Parameter veroeffentlichen + Console-Override lesen ──────
+    if (shmChannel >= 0)
+    {
+        if (auto* ch = shmBlock.get(shmChannel))
+        {
+            // Aktuellen Zustand fuer Console-Anzeige schreiben
+            ch->preampDb  .store(preampGainDb,         std::memory_order_relaxed);
+            ch->pan       .store(pan,                  std::memory_order_relaxed);
+            ch->eqLow     .store(eqLow,                std::memory_order_relaxed);
+            ch->eqMid     .store(eqMid,                std::memory_order_relaxed);
+            ch->eqHigh    .store(eqHigh,               std::memory_order_relaxed);
+            ch->morph     .store(morphAmount,          std::memory_order_relaxed);
+            ch->wavetable .store(wavetableIdx,         std::memory_order_relaxed);
+            ch->hpfEnabled.store(hpfEnabled ? 1u : 0u, std::memory_order_relaxed);
+
+            // Console-Override anwenden wenn aktiv
+            if (ch->hasOverride.load(std::memory_order_acquire))
+            {
+                preampGainDb = ch->ovPreampDb  .load(std::memory_order_relaxed);
+                pan          = ch->ovPan       .load(std::memory_order_relaxed);
+                eqLow        = ch->ovEqLow     .load(std::memory_order_relaxed);
+                eqMid        = ch->ovEqMid     .load(std::memory_order_relaxed);
+                eqHigh       = ch->ovEqHigh    .load(std::memory_order_relaxed);
+                morphAmount  = ch->ovMorph     .load(std::memory_order_relaxed);
+                wavetableIdx = static_cast<int>(ch->ovWavetable .load(std::memory_order_relaxed));
+                hpfEnabled   = ch->ovHpfEnabled.load(std::memory_order_relaxed) != 0;
+            }
+        }
+    }
+
+    // ── EQ (mit evtl. ueberschriebenen Parametern) ───────────────────────────
+    eqProcessor.setParameters(eqLow, eqMid, eqHigh, hpfEnabled);
     eqProcessor.process(buffer, numSamples);
 
     // ── Console Mode: Fremd-Pegel lesen ──────────────────────────────────────
-    float crosstalk = 0.0f;
+    float crosstalk  = 0.0f;
     float voltageSag = 1.0f;
+    float morphMod   = 0.0f;
 
     if (consoleOn && instanceSlot >= 0)
     {
+        // Group-ID aktuell halten (user kann Combo zur Laufzeit ändern)
+        InstanceRegistry::getInstance().setGroup(instanceSlot, consoleGroup);
         InstanceRegistry::getInstance().readConsoleState(
-            instanceSlot, consoleGroup, crosstalk, voltageSag);
+            instanceSlot, consoleGroup, crosstalk, voltageSag, morphMod);
     }
 
-    // ── Preamp / Wavefolding + Pan ────────────────────────────────────────────
-    const float preampLinear = juce::Decibels::decibelsToGain(preampGainDb) * voltageSag;
+    // One-Pole Smoothing (~10 ms): verhindert Knackser durch Transientensprünge
+    {
+        const float tc   = 0.010f; // 10 ms Zeitkonstante
+        const float sr   = static_cast<float>(getSampleRate());
+        const float alpha = (sr > 0.0f)
+            ? 1.0f - std::exp(-static_cast<float>(numSamples) / (sr * tc))
+            : 1.0f;
+        smoothedSag       += alpha * (voltageSag - smoothedSag);
+        smoothedMorphMod  += alpha * (morphMod   - smoothedMorphMod);
+    }
 
-    // Stereo-Pan (linear, Equal-Power-Annäherung)
+    const float effectiveMorph = std::clamp(morphAmount + smoothedMorphMod, 0.0f, 1.0f);
+
+    // ── Preamp / Wavefolding + Pan  (2x oversampled → kein Aliasing) ─────────
+    const float preampLinear = juce::Decibels::decibelsToGain(preampGainDb) * smoothedSag;
+
+    // Equal-Power-Pan
     const float panL = std::cos((pan + 1.0f) * 0.25f * 3.14159265f);
     const float panR = std::sin((pan + 1.0f) * 0.25f * 3.14159265f);
 
-    if (buffer.getNumChannels() >= 2)
+    // 1. Upsample auf 2x Samplerate
+    juce::dsp::AudioBlock<float> nativeBlock(buffer);
+    auto osBlock = oversampling.processSamplesUp(nativeBlock);
+    const int numOSSamples = static_cast<int>(osBlock.getNumSamples());
+
+    // ── Analytische tanh-Sättigung ────────────────────────────────────────────
+    // Beide Kanäle nutzen denselben Drive (kein Level-Imbalance).
+    // L/R-Charakteristik entsteht durch:
+    //   1. gainVarDbL/R  → kleiner dB-Offset  → Stereo-Image im Imager sichtbar
+    //   2. asymVarL/R    → DC-kompensierte Asymmetrie → verschiedene 2nd Harmonics
+    // Link ON  → gainR = gainL, asymR = asymL  (Kanäle identisch)
+    // Link OFF → unabhängige Werte, jede Instanz anders
+    static const float kPresetDrives[3] = { 2.5f, 5.0f, 9.0f };
+    const float drive     = kPresetDrives[std::clamp(wavetableIdx, 0, 2)];
+    const float tanhDrive = std::tanh(drive);
+
+    const float gainL = juce::Decibels::decibelsToGain(gainVarDbL);
+    const float gainR = lrLink ? gainL : juce::Decibels::decibelsToGain(gainVarDbR);
+
+    const float asymL = lrLink ? 0.0f : asymVarL;
+    const float asymR = lrLink ? 0.0f : asymVarR;
+
+    // DC-Offset, der durch die Asymmetrie entsteht, vorab berechnen und subtrahieren
+    const float dcL = (tanhDrive > 1e-6f) ? std::tanh(asymL * drive) / tanhDrive : 0.0f;
+    const float dcR = (tanhDrive > 1e-6f) ? std::tanh(asymR * drive) / tanhDrive : 0.0f;
+
+    // Blend: morph=0 → y=x (sauber), morph=1 → asymmetrische tanh-Sättigung
+    auto applyL = [&](float x) noexcept -> float {
+        if (effectiveMorph < 1e-4f) return x * gainL;
+        const float sat = (tanhDrive > 1e-6f) ? std::tanh((x + asymL) * drive) / tanhDrive - dcL : x;
+        return (x + effectiveMorph * (sat - x)) * gainL;
+    };
+    auto applyR = [&](float x) noexcept -> float {
+        if (effectiveMorph < 1e-4f) return x * gainR;
+        const float sat = (tanhDrive > 1e-6f) ? std::tanh((x + asymR) * drive) / tanhDrive - dcR : x;
+        return (x + effectiveMorph * (sat - x)) * gainR;
+    };
+
+    if (osBlock.getNumChannels() >= 2)
     {
-        float* dataL = buffer.getWritePointer(0);
-        float* dataR = buffer.getWritePointer(1);
+        float* osL = osBlock.getChannelPointer(0);
+        float* osR = osBlock.getChannelPointer(1);
 
-        const WavetableManager& wtL = wavetableManagerL;
-        // R nutzt L-Variation wenn LR-Link aktiv
-        const WavetableManager& wtR = lrLink ? wavetableManagerL : wavetableManagerR;
-
-        for (int n = 0; n < numSamples; ++n)
+        for (int n = 0; n < numOSSamples; ++n)
         {
-            // Preamp-Gain anwenden
-            const float inL = dataL[n] * preampLinear;
-            const float inR = dataR[n] * preampLinear;
+            const float inL = osL[n] * preampLinear;
+            const float inR = osR[n] * preampLinear;
 
-            // Wavefolding via Wavetable
-            const float foldedL = wtL.processSample(inL, morphAmount);
-            const float foldedR = wtR.processSample(inR, morphAmount);
+            const float foldedL = applyL(inL);
+            const float foldedR = applyR(inR);
 
-            // Crosstalk hinzumischen (Console Mode)
-            const float outL = foldedL * panL + foldedR * crosstalk;
-            const float outR = foldedR * panR + foldedL * crosstalk;
-
-            dataL[n] = outL;
-            dataR[n] = outR;
+            osL[n] = foldedL * panL + foldedR * crosstalk;
+            osR[n] = foldedR * panR + foldedL * crosstalk;
         }
+    }
 
-        // ── Console Mode: eigenen RMS schreiben ──────────────────────────────
-        if (consoleOn && instanceSlot >= 0)
-        {
-            const float rmsL = computeRMS(dataL, numSamples);
-            const float rmsR = computeRMS(dataR, numSamples);
-            InstanceRegistry::getInstance().writeRMS(instanceSlot, rmsL, rmsR);
-        }
+    // 2. Downsample zurück auf native Samplerate
+    oversampling.processSamplesDown(nativeBlock);
+
+    // ── Console Mode: eigenen RMS schreiben (nach Downsample) ────────────────
+    if (consoleOn && instanceSlot >= 0)
+    {
+        const float rmsL = computeRMS(buffer.getReadPointer(0), numSamples);
+        const float rmsR = computeRMS(buffer.getReadPointer(1), numSamples);
+        InstanceRegistry::getInstance().writeRMS(instanceSlot, rmsL, rmsR);
     }
 }
 

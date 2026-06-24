@@ -3,17 +3,14 @@
 #include <algorithm>
 #include <random>
 
-// ── Konstanten ────────────────────────────────────────────────────────────────
 static constexpr float kPi = 3.14159265358979323846f;
 
-// ── Konstruktor ───────────────────────────────────────────────────────────────
 WavetableManager::WavetableManager()
 {
     buildPreset(0, tableA);
     buildPreset(0, tableB);
 }
 
-// ── Non-RT: Preset laden ──────────────────────────────────────────────────────
 void WavetableManager::loadPreset(int presetIndex) noexcept
 {
     buildPreset(presetIndex, *stagingTable);
@@ -30,18 +27,15 @@ void WavetableManager::loadCustomWavetable(const float* data, int numRows, int n
         for (std::size_t c = 0; c < cols; ++c)
             (*stagingTable)[r][c] = data[r * static_cast<std::size_t>(numCols) + c];
 
-    // Lücken auffüllen (falls kleinere Tabelle übergeben)
     for (std::size_t r = rows; r < static_cast<std::size_t>(kTableSize); ++r)
         (*stagingTable)[r] = (*stagingTable)[rows - 1];
 
     commitStagingBuffer();
-    activePreset.store(-1); // -1 = Custom
+    activePreset.store(-1);
 }
 
 void WavetableManager::applyInstanceVariation(float variationAmount) noexcept
 {
-    // variationAmount ≈ 0.03 (3 %)
-    // Verwendet einen deterministischen RNG – nicht im Audio-Thread!
     std::mt19937 rng(std::random_device{}());
     std::uniform_real_distribution<float> dist(-variationAmount, variationAmount);
 
@@ -52,23 +46,43 @@ void WavetableManager::applyInstanceVariation(float variationAmount) noexcept
             val = std::clamp(val + dist(rng), -1.0f, 1.0f);
         }
 
+    // Odd-Symmetrie erzwingen nach Variation (f(-x) = -f(x), kein DC)
+    for (std::size_t r = 0; r < static_cast<std::size_t>(kTableSize); ++r)
+    {
+        (*stagingTable)[r][kWaveSize / 2] = 0.0f;
+        for (std::size_t c = 0; c < static_cast<std::size_t>(kWaveSize / 2); ++c)
+        {
+            const std::size_t mirror = static_cast<std::size_t>(kWaveSize) - 1u - c;
+            const float avg = ((*stagingTable)[r][mirror] - (*stagingTable)[r][c]) * 0.5f;
+            (*stagingTable)[r][mirror] =  avg;
+            (*stagingTable)[r][c]      = -avg;
+        }
+    }
+
     commitStagingBuffer();
 }
 
-// ── RT-safe: Waveshaping ──────────────────────────────────────────────────────
 float WavetableManager::processSample(float sample, float morphPos) const noexcept
 {
     const Table* tbl = activeTable.load(std::memory_order_acquire);
     return lookupInterpolated(*tbl, morphPos, sample);
 }
 
-// ── Privat: Preset-Builder ────────────────────────────────────────────────────
+// ── Preset-Builder ────────────────────────────────────────────────────────────
+//
+// Morph = 0  →  exakt linear (y = x), keinerlei Verzerrung
+// Morph = 1  →  sanfte tanh-Saettigung (analog, kein Fold, kein Knirschen)
+//
+// Preset 0: sehr subtil  (Drive 2.5)  – Röhrenwärme
+// Preset 1: medium       (Drive 5.0)  – klarer Charakter
+// Preset 2: staerker     (Drive 9.0)  – offensiver, aber glatt
+//
 void WavetableManager::buildPreset(int presetIndex, Table& target) noexcept
 {
-    // Preset 0: linear → soft clip (tanh-Wavefolding)
-    // Preset 1: linear → hard fold (sinus-basiert)
-    // Preset 2: linear → tube saturation (asymmetrisch)
-    // ... weitere Presets können hier ergänzt werden.
+    // maxDrive bei Morph=1 (je hoeher, desto mehr Saettigung, aber nie Fold)
+    const float maxDrives[kMaxPresets] = { 2.5f, 5.0f, 9.0f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f };
+    const float drive     = maxDrives[std::clamp(presetIndex, 0, kMaxPresets - 1)];
+    const float tanhDrive = std::tanh(drive);
 
     for (std::size_t row = 0; row < static_cast<std::size_t>(kTableSize); ++row)
     {
@@ -76,70 +90,42 @@ void WavetableManager::buildPreset(int presetIndex, Table& target) noexcept
 
         for (std::size_t col = 0; col < static_cast<std::size_t>(kWaveSize); ++col)
         {
-            // x ∈ [-1, +1]
-            const float x = (static_cast<float>(col) / static_cast<float>(kWaveSize - 1)) * 2.0f - 1.0f;
+            const float x = (static_cast<float>(col) / static_cast<float>(kWaveSize - 1))
+                            * 2.0f - 1.0f;
 
-            float y = x; // Standard: linear (clean)
+            // Linearer Blend: 0%=clean, 100%=gesaettigt
+            // Bei morphFrac=0: y = x (exakt identisch, kein Eingriff)
+            // Bei morphFrac=1: y = tanh(x*drive)/tanh(drive)
+            const float saturated = (tanhDrive > 1e-6f)
+                                    ? std::tanh(x * drive) / tanhDrive
+                                    : x;
 
-            switch (presetIndex)
-            {
-                case 0: // Soft Clip / Tanh Wavefolding
-                {
-                    const float drive = 1.0f + morphFrac * 8.0f;
-                    y = std::tanh(x * drive) / std::tanh(drive);
-                    break;
-                }
-                case 1: // Sinus Wavefolding
-                {
-                    const float drive = 1.0f + morphFrac * 3.0f;
-                    y = std::sin(x * drive * kPi * 0.5f);
-                    break;
-                }
-                case 2: // Asymmetrische Tube-Sättigung
-                {
-                    const float drive = 1.0f + morphFrac * 5.0f;
-                    if (x >= 0.0f)
-                        y = 1.0f - std::exp(-x * drive);
-                    else
-                        y = -(1.0f - std::exp(x * drive * 0.5f));
-                    // Normalisieren
-                    const float norm = 1.0f - std::exp(-drive);
-                    if (norm > 1e-6f) y /= norm;
-                    break;
-                }
-                default: // Fallback: linear
-                    y = x;
-                    break;
-            }
-
-            target[row][col] = std::clamp(y, -1.0f, 1.0f);
+            target[row][col] = x + morphFrac * (saturated - x);
         }
     }
 }
 
 void WavetableManager::commitStagingBuffer() noexcept
 {
-    Table* oldActive   = activeTable.exchange(stagingTable, std::memory_order_acq_rel);
-    stagingTable       = oldActive; // alter aktiver Puffer wird neuer Staging
+    Table* oldActive = activeTable.exchange(stagingTable, std::memory_order_acq_rel);
+    stagingTable     = oldActive;
 }
 
-// ── Lookup mit bilinearer Interpolation ──────────────────────────────────────
 float WavetableManager::lookupInterpolated(const Table& table,
                                             float morphPos, float x) noexcept
 {
-    // morphPos ∈ [0,1] → Zeilenindex
-    const float rowF  = std::clamp(morphPos, 0.0f, 1.0f) * static_cast<float>(kTableSize - 1);
-    const auto  row0  = static_cast<std::size_t>(rowF);
-    const auto  row1  = std::min(row0 + 1, static_cast<std::size_t>(kTableSize - 1));
-    const float rowT  = rowF - static_cast<float>(row0);
+    const float rowF = std::clamp(morphPos, 0.0f, 1.0f)
+                       * static_cast<float>(kTableSize - 1);
+    const auto  row0 = static_cast<std::size_t>(rowF);
+    const auto  row1 = std::min(row0 + 1, static_cast<std::size_t>(kTableSize - 1));
+    const float rowT = rowF - static_cast<float>(row0);
 
-    // x ∈ [-1,1] → Spaltenindex
-    const float colF  = std::clamp((x + 1.0f) * 0.5f, 0.0f, 1.0f) * static_cast<float>(kWaveSize - 1);
-    const auto  col0  = static_cast<std::size_t>(colF);
-    const auto  col1  = std::min(col0 + 1, static_cast<std::size_t>(kWaveSize - 1));
-    const float colT  = colF - static_cast<float>(col0);
+    const float colF = std::clamp((x + 1.0f) * 0.5f, 0.0f, 1.0f)
+                       * static_cast<float>(kWaveSize - 1);
+    const auto  col0 = static_cast<std::size_t>(colF);
+    const auto  col1 = std::min(col0 + 1, static_cast<std::size_t>(kWaveSize - 1));
+    const float colT = colF - static_cast<float>(col0);
 
-    // Bilineare Interpolation
     const float v00 = table[row0][col0];
     const float v10 = table[row1][col0];
     const float v01 = table[row0][col1];

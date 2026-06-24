@@ -4,34 +4,27 @@
 #include "DSP/EQProcessor.h"
 #include "DSP/WavetableManager.h"
 #include "ConsoleMode/InstanceRegistry.h"
+#include "SharedMemory/SharedParameterBlock.h"
 
 // ── Parameter-IDs ─────────────────────────────────────────────────────────────
 namespace ParamID
 {
-    // EQ
+    // EQ – 3 Knobs, feste Frequenzen (100 Hz / 1 kHz / 10 kHz)
     static constexpr auto HPF_ENABLED    = "hpf_enabled";
-    static constexpr auto LS_FREQ        = "ls_freq";
-    static constexpr auto LS_GAIN        = "ls_gain";
-    static constexpr auto MID_FREQ       = "mid_freq";
-    static constexpr auto MID_GAIN       = "mid_gain";
-    static constexpr auto MID_Q          = "mid_q";
-    static constexpr auto HS_FREQ        = "hs_freq";
-    static constexpr auto HS_GAIN        = "hs_gain";
+    static constexpr auto EQ_LOW         = "eq_low";    // Low Shelf ±12 dB
+    static constexpr auto EQ_MID         = "eq_mid";    // Mid Bell  ±12 dB
+    static constexpr auto EQ_HIGH        = "eq_high";   // High Shelf ±12 dB
 
     // Routing
     static constexpr auto PAN            = "pan";
 
     // Preamp / Wavefolding
     static constexpr auto PREAMP_GAIN    = "preamp_gain";
-    static constexpr auto MORPH_AMOUNT   = "morph_amount";   // Wavefolding-Intensität
+    static constexpr auto MORPH_AMOUNT   = "morph_amount";
     static constexpr auto WAVETABLE_IDX  = "wavetable_idx";
-    static constexpr auto LR_LINK        = "lr_link";        // L→R Variation linken
+    static constexpr auto LR_LINK        = "lr_link";
 
-    // Instanz-Variation
-    static constexpr auto VARIATION_L    = "variation_l";    // ±-Wert, Anzeige only
-    static constexpr auto VARIATION_R    = "variation_r";
-
-    // Console Mode
+    // Console Mode (max. 4 Gruppen: 0–3)
     static constexpr auto CONSOLE_ENABLE = "console_enable";
     static constexpr auto CONSOLE_GROUP  = "console_group";
 }
@@ -75,18 +68,43 @@ public:
     /** Lade eigene Wavetable (non-RT, z.B. aus FileChooser). */
     void loadCustomWavetable(const float* data, int numRows, int numCols);
 
+    // ── Console / SharedMemory API ────────────────────────────────────────────
+    SharedParameterBlock& getSharedBlock() noexcept { return shmBlock; }
+    int  getShmChannel()  const noexcept { return shmChannel; }
+    juce::String getChannelDisplayName() const { return channelName; }
+    void setChannelDisplayName(const juce::String& n);
+    void updateTrackProperties(const TrackProperties& props) override;
 private:
     // ── DSP ──────────────────────────────────────────────────────────────────
     EQProcessor      eqProcessor;
-    WavetableManager wavetableManagerL;   // L-Kanal Variation
-    WavetableManager wavetableManagerR;   // R-Kanal Variation
+    WavetableManager wavetableManagerL;
+    WavetableManager wavetableManagerR;
+
+    // 2x Oversampling – nur für den Waveshaper-Abschnitt.
+    // Latenz: ~11 Samples @ 44.1 kHz (wird dem Host gemeldet → PDC).
+    juce::dsp::Oversampling<float> oversampling {
+        2, 1,
+        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR };
 
     // ── Console Mode ─────────────────────────────────────────────────────────
     int instanceSlot { -1 };
 
-    // ── Instanz-Variation ────────────────────────────────────────────────────
-    float variationL { 0.03f };
-    float variationR { 0.03f };
+    // ── Instanz-Variation (analog console character) ─────────────────────────
+    float variationL   { 0.0f };   // für WavetableManager (kein hot-path Einfluss)
+    float variationR   { 0.0f };
+    float gainVarDbL   { 0.0f };   // Level-Offset L in dB → Stereo-Image
+    float gainVarDbR   { 0.0f };   // Level-Offset R in dB → Stereo-Image
+    float asymVarL     { 0.0f };   // Asymmetrie → 2nd Harmonics (Charakter L)
+    float asymVarR     { 0.0f };   // Asymmetrie → 2nd Harmonics (Charakter R)
+
+    // ── Console-Mode Smoothing (One-Pole, ~10 ms) ────────────────────────────
+    float smoothedSag      { 1.0f };
+    float smoothedMorphMod { 0.0f };
+
+    // ── Shared parameter block (cross-plugin Console communication) ──────────
+    SharedParameterBlock shmBlock;
+    int                  shmChannel { -1 };
+    juce::String         channelName { "CH" };
 
     // ── Hilfsfunktionen ──────────────────────────────────────────────────────
     /** Berechnet RMS eines Mono-Blocks (RT-safe). */

@@ -1,0 +1,58 @@
+name: Build VST3
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            cmake_generator: "Visual Studio 17 2022"
+            artifact_path: "build/SteinbachChanelStrip_artefacts/Release/VST3"
+            artifact_name: "SteinbachChanelStrip-Windows-VST3"
+          - os: macos-latest
+            cmake_generator: "Ninja"
+            artifact_path: "build/SteinbachChanelStrip_artefacts/Release/VST3"
+            artifact_name: "SteinbachChanelStrip-macOS-VST3"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -G "${{ matrix.cmake_generator }}" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build -G "${{ matrix.cmake_generator }}" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload SteinbachChanelStrip VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload SteinbachConsole VST3 (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SteinbachConsole-Windows-VST3
+          path: build/SteinbachConsole_artefacts/Release/VST3
+          if-no-files-found: error
