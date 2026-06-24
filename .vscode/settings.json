@@ -1,0 +1,27 @@
+{
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.generator": "Ninja",
+    "cmake.configureArgs": [],
+    "cmake.buildArgs": [],
+    "cmake.parallelJobs": 0,
+    "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json",
+
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.cppStandard": "c++17",
+
+    "editor.formatOnSave": true,
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp"
+    },
+
+    // Build-Artefakte aus der Suche ausschließen
+    "files.exclude": {
+        "build/**": true,
+        "JUCE/**": true
+    },
+    "search.exclude": {
+        "build/**": true,
+        "JUCE/**": true
+    }
+}
