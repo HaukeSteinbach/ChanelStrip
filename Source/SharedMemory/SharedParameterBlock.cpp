@@ -1,10 +1,21 @@
 #include "SharedParameterBlock.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 #include <cstring>
+
+namespace
+{
+#if defined(_WIN32)
+constexpr const char* kWindowsShmName = "Local\\steinbach_console_v1";
+#endif
+}
 
 size_t SharedParameterBlock::shmSize() noexcept { return sizeof(Layout); }
 
@@ -20,6 +31,21 @@ SharedParameterBlock::~SharedParameterBlock()
 
 bool SharedParameterBlock::openMapping()
 {
+#if defined(_WIN32)
+    mappingHandle_ = ::CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+                                          0, static_cast<DWORD>(shmSize()), kWindowsShmName);
+    if (!mappingHandle_)
+        return false;
+
+    void* ptr = ::MapViewOfFile(static_cast<HANDLE>(mappingHandle_),
+                                FILE_MAP_ALL_ACCESS, 0, 0, shmSize());
+    if (!ptr)
+    {
+        ::CloseHandle(static_cast<HANDLE>(mappingHandle_));
+        mappingHandle_ = nullptr;
+        return false;
+    }
+#else
     // O_CREAT | O_RDWR: create if absent, otherwise open existing
     fd_ = ::shm_open(kShmName, O_CREAT | O_RDWR, 0600);
     if (fd_ < 0)
@@ -45,10 +71,15 @@ bool SharedParameterBlock::openMapping()
         fd_ = -1;
         return false;
     }
+#endif
 
     data_ = static_cast<Layout*>(ptr);
 
+#if defined(_WIN32)
+    const uint32_t thisPid = static_cast<uint32_t>(::GetCurrentProcessId());
+#else
     const uint32_t thisPid = static_cast<uint32_t>(::getpid());
+#endif
 
     // First opener: magic CAS from 0 → kMagic initialises fresh memory.
     uint32_t expected = 0;
@@ -91,17 +122,31 @@ void SharedParameterBlock::closeMapping()
             std::memory_order_acq_rel) - 1;
 
         // Last one out: unlink the shared memory region so it's recreated fresh next session.
+#if ! defined(_WIN32)
         if (remaining == 0)
             ::shm_unlink(kShmName);
+#endif
 
+#if defined(_WIN32)
+        ::UnmapViewOfFile(data_);
+#else
         ::munmap(data_, shmSize());
+#endif
         data_ = nullptr;
     }
+#if defined(_WIN32)
+    if (mappingHandle_)
+    {
+        ::CloseHandle(static_cast<HANDLE>(mappingHandle_));
+        mappingHandle_ = nullptr;
+    }
+#else
     if (fd_ >= 0)
     {
         ::close(fd_);
         fd_ = -1;
     }
+#endif
 }
 
 int SharedParameterBlock::acquireChannel(const char* initialName) noexcept
