@@ -1,9 +1,15 @@
 #include "SharedParameterBlock.h"
 
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+#else
+  #include <sys/mman.h>
+  #include <sys/stat.h>
+  #include <fcntl.h>
+  #include <unistd.h>
+#endif
+
 #include <cstring>
 
 size_t SharedParameterBlock::shmSize() noexcept { return sizeof(Layout); }
@@ -20,12 +26,33 @@ SharedParameterBlock::~SharedParameterBlock()
 
 bool SharedParameterBlock::openMapping()
 {
-    // O_CREAT | O_RDWR: create if absent, otherwise open existing
+#ifdef _WIN32
+    // Windows: named file mapping (strip leading '/' from POSIX-style name)
+    const char* winName = kShmName + 1; // "steinbach_console_v1"
+    const DWORD sizeLow = static_cast<DWORD>(shmSize());
+
+    hMapping_ = ::OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, winName);
+    if (!hMapping_)
+        hMapping_ = ::CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr,
+                                          PAGE_READWRITE, 0, sizeLow, winName);
+    if (!hMapping_)
+        return false;
+
+    void* ptr = ::MapViewOfFile(hMapping_, FILE_MAP_ALL_ACCESS, 0, 0, shmSize());
+    if (!ptr)
+    {
+        ::CloseHandle(hMapping_);
+        hMapping_ = nullptr;
+        return false;
+    }
+
+    const uint32_t thisPid = static_cast<uint32_t>(::GetCurrentProcessId());
+#else
+    // POSIX: shm_open + mmap
     fd_ = ::shm_open(kShmName, O_CREAT | O_RDWR, 0600);
     if (fd_ < 0)
         return false;
 
-    // Grow the region to full size if needed (safe to call even if already correct size)
     struct stat st;
     if (::fstat(fd_, &st) == 0 && static_cast<size_t>(st.st_size) < shmSize())
     {
@@ -46,28 +73,26 @@ bool SharedParameterBlock::openMapping()
         return false;
     }
 
+    const uint32_t thisPid = static_cast<uint32_t>(::getpid());
+#endif
+
     data_ = static_cast<Layout*>(ptr);
 
-    const uint32_t thisPid = static_cast<uint32_t>(::getpid());
-
-    // First opener: magic CAS from 0 → kMagic initialises fresh memory.
+    // First opener: CAS magic 0 → kMagic initialises fresh memory.
     uint32_t expected = 0;
     if (data_->magic.compare_exchange_strong(expected, kMagic,
             std::memory_order_acq_rel, std::memory_order_acquire))
     {
-        // Fresh memory (OS-zeroed). Store session PID and refCount.
         data_->sessionPid.store(thisPid, std::memory_order_relaxed);
         data_->refCount.store(1, std::memory_order_release);
     }
     else
     {
-        // Memory already exists. Check if it's from a previous DAW session.
         uint32_t storedPid = data_->sessionPid.load(std::memory_order_acquire);
         if (storedPid != thisPid &&
             data_->sessionPid.compare_exchange_strong(storedPid, thisPid,
                 std::memory_order_acq_rel, std::memory_order_relaxed))
         {
-            // We won the race: wipe all stale channels from the previous session.
             for (int i = 0; i < kMaxChannels; ++i)
             {
                 data_->channels[i].hasOverride.store(0, std::memory_order_relaxed);
@@ -90,18 +115,31 @@ void SharedParameterBlock::closeMapping()
         const uint32_t remaining = data_->refCount.fetch_sub(1,
             std::memory_order_acq_rel) - 1;
 
-        // Last one out: unlink the shared memory region so it's recreated fresh next session.
+#ifdef _WIN32
+        // Windows: mapping is destroyed automatically when all handles are closed
+        (void)remaining;
+        ::UnmapViewOfFile(data_);
+#else
         if (remaining == 0)
             ::shm_unlink(kShmName);
-
         ::munmap(data_, shmSize());
+#endif
         data_ = nullptr;
     }
+
+#ifdef _WIN32
+    if (hMapping_)
+    {
+        ::CloseHandle(hMapping_);
+        hMapping_ = nullptr;
+    }
+#else
     if (fd_ >= 0)
     {
         ::close(fd_);
         fd_ = -1;
     }
+#endif
 }
 
 int SharedParameterBlock::acquireChannel(const char* initialName) noexcept

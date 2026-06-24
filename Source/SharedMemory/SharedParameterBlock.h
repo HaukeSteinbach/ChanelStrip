@@ -113,7 +113,11 @@ private:
         Channel               channels[kMaxChannels];
     };
 
-    int     fd_   { -1      };
+#ifdef _WIN32
+    void*   hMapping_ { nullptr };
+#else
+    int     fd_       { -1      };
+#endif
     Layout* data_ { nullptr };
 
     bool openMapping();
