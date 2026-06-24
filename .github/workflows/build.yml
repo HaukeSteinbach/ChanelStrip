@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            cmake_generator: "Visual Studio 17 2022"
+            cmake_generator: "Ninja"
             artifact_path: "build/SteinbachChanelStrip_artefacts/Release/VST3"
             artifact_name: "SteinbachChanelStrip-Windows-VST3"
           - os: macos-latest
@@ -26,6 +26,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
