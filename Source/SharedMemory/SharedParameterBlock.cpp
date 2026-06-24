@@ -10,6 +10,13 @@
 #endif
 #include <cstring>
 
+namespace
+{
+#if defined(_WIN32)
+constexpr const char* kWindowsShmName = "Local\\steinbach_console_v1";
+#endif
+}
+
 size_t SharedParameterBlock::shmSize() noexcept { return sizeof(Layout); }
 
 SharedParameterBlock::SharedParameterBlock()
@@ -26,7 +33,7 @@ bool SharedParameterBlock::openMapping()
 {
 #if defined(_WIN32)
     mappingHandle_ = ::CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
-                                          0, static_cast<DWORD>(shmSize()), "Local\\steinbach_console_v1");
+                                          0, static_cast<DWORD>(shmSize()), kWindowsShmName);
     if (!mappingHandle_)
         return false;
 
