@@ -201,6 +201,30 @@ public:
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// showPanContextMenu
+// ─────────────────────────────────────────────────────────────────────────────
+void SteinbachChanelStripAudioProcessorEditor::showPanContextMenu()
+{
+    const bool isOn = *audioProcessor.apvts.getRawParameterValue(ParamID::BINAURAL_PAN) > 0.5f;
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Pan-Modus");
+    menu.addItem(1, "Binaural Pan", true, isOn);
+
+    menu.showMenuAsync({}, [this](int result)
+                       {
+        if (result == 1)
+        {
+            if (auto* p = audioProcessor.apvts.getParameter(ParamID::BINAURAL_PAN))
+            {
+                p->beginChangeGesture();
+                p->setValueNotifyingHost(p->getValue() > 0.5f ? 0.0f : 1.0f);
+                p->endChangeGesture();
+            }
+        } });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // initKnob
 // ─────────────────────────────────────────────────────────────────────────────
 void SteinbachChanelStripAudioProcessorEditor::initKnob(
@@ -235,7 +259,9 @@ SteinbachChanelStripAudioProcessorEditor::SteinbachChanelStripAudioProcessorEdit
     hpfAttach = std::make_unique<ButtonAttach>(apvts, ParamID::HPF_ENABLED, hpfButton);
     addAndMakeVisible(hpfButton);
 
-    initKnob(panKnob, "Pan (L / R)");
+    initKnob(panKnob, "Pan (L / R)  |  Rechtsklick: Binaural Pan");
+    panKnob.onRightClick = [this]
+    { showPanContextMenu(); };
     initKnob(preampKnob, "Preamp Gain +/-24 dB");
     initKnob(morphKnob, "Character");
     panAttach = std::make_unique<SliderAttach>(apvts, ParamID::PAN, panKnob);
@@ -309,13 +335,13 @@ void SteinbachChanelStripAudioProcessorEditor::paint(juce::Graphics &g)
 {
     g.fillAll(kBG);
 
-    // ── Title (2-row: top=STEINBACH, bottom=CHANNEL STRIP v0.4) ────────────────
+    // ── Title (2-row: top=STEINBACH, bottom=CHANNEL STRIP v1.0) ──────────────────────
     g.setColour(kText);
     g.setFont(juce::Font(13.0f, juce::Font::bold));
     g.drawText("STEINBACH", 14, 2, 140, 16, juce::Justification::centredLeft);
     g.setColour(kSubText.brighter(0.2f));
     g.setFont(juce::Font(10.0f));
-    g.drawText("CHANNEL STRIP  v0.4", 14, 19, 180, 13, juce::Justification::centredLeft);
+    g.drawText("CHANNEL STRIP  v1.0", 14, 19, 180, 13, juce::Justification::centredLeft);
 
     // Thin divider
     g.setColour(kBorder);

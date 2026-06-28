@@ -1,0 +1,18 @@
+# ninja log v7
+1	30	1782659341308883103	/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/tools/CMakeFiles/cmake.verify_globs	cc4bab3482486f48
+33	86	1782659341340232955	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_core/juce_core_CompilationTime.cpp.o	a00f70728f1d80
+31	202	1782659341339022211	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics_Sheenbidi.c.o	3d4950ae91cca35a
+33	1012	1782659341340556412	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_data_structures/juce_data_structures.mm.o	b6cd8c11d996f51e
+31	1360	1782659341338161007	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/juce_build_tools/juce_build_tools.cpp.o	52912ae603af062d
+30	1414	1782659341337958507	extras/Build/juceaide/CMakeFiles/juceaide.dir/Main.cpp.o	fec85271e25c300e
+32	1616	1782659341339851374	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_events/juce_events.mm.o	341b4f19f07b9c88
+31	1670	1782659341338278839	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics_2.cpp.o	6ade298a39f343d9
+31	2214	1782659341338492213	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics_4.cpp.o	f0bbeb64ba44fcd6
+31	2283	1782659341338606963	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics_5.cpp.o	bf4483d5fd04996a
+33	2401	1782659341340399079	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_core/juce_core.mm.o	9b238c9cb4386531
+31	2837	1782659341338387672	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics_3.cpp.o	3c9a9542e0c55e8e
+31	3597	1782659341338735587	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics.mm.o	99cd5a0a828d3644
+31	3687	1782659341338879628	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics_Harfbuzz.cpp.o	873749a668e1b0d2
+32	3846	1782659341339266335	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics.mm.o	a4eba654faee1c20
+3846	3980	1782659345153475182	extras/Build/juceaide/juceaide_artefacts/Custom/juceaide	384f7416c8d927e8
+2	30	1782660380301536477	/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/tools/CMakeFiles/cmake.verify_globs	cc4bab3482486f48

@@ -3,6 +3,22 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
+// ── PanKnob: Slider mit Rechtsklick-Menü (Binaural Pan) ───────────────────────────
+class PanKnob : public juce::Slider
+{
+public:
+    std::function<void()> onRightClick;
+    void mouseDown(const juce::MouseEvent &e) override
+    {
+        if (e.mods.isRightButtonDown() && onRightClick)
+        {
+            onRightClick();
+            return;
+        }
+        juce::Slider::mouseDown(e);
+    }
+};
+
 class SteinbachChanelStripAudioProcessorEditor
     : public juce::AudioProcessorEditor,
       private juce::Timer
@@ -29,7 +45,7 @@ private:
     std::unique_ptr<ButtonAttach> hpfAttach;
 
     // ── Routing ──────────────────────────────────────────────────────────────
-    juce::Slider panKnob;
+    PanKnob panKnob; // Rechtsklick → Binaural Pan ein/aus
     std::unique_ptr<SliderAttach> panAttach;
 
     // ── Preamp ───────────────────────────────────────────────────────────────
@@ -53,6 +69,7 @@ private:
 
     void initKnob(juce::Slider &s, const juce::String &tooltip);
     void timerCallback() override; // polls channel name from processor
+    void showPanContextMenu();     // Rechtsklick auf PanKnob
 
     std::unique_ptr<juce::LookAndFeel_V4> laf;
 

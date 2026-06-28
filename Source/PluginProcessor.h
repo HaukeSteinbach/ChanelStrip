@@ -17,6 +17,7 @@ namespace ParamID
 
     // Routing
     static constexpr auto PAN = "pan";
+    static constexpr auto BINAURAL_PAN = "binaural_pan";
 
     // Preamp / Wavefolding
     static constexpr auto PREAMP_GAIN = "preamp_gain";
@@ -109,7 +110,11 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothPreamp;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothPanL;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothPanR;
-
+    // ── Binaural Pan (Woodworth-ITD + ILD) ───────────────────────────────────────
+    // Max ITD @ 44.1 kHz: ~29 Samples  →  64 Samples Puffer reicht
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> binDelayL, binDelayR;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> binDelaySmL, binDelaySmR;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> binGainSmL, binGainSmR;
     // ── Shared parameter block (cross-plugin Console communication) ──────────
     SharedParameterBlock shmBlock;
     int shmChannel{-1};

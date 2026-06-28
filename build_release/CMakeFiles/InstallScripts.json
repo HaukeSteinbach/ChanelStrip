@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/cmake_install.cmake",
+		"/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/cmake_install.cmake",
+		"/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/modules/cmake_install.cmake",
+		"/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/extras/Build/cmake_install.cmake",
+		"/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/JUCE/extras/Build/juceaide/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

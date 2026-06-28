@@ -1,0 +1,3 @@
+/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/vst3_helpers/SteinbachChanelStrip/CMakeFiles/vst3_helper.dir
+/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/vst3_helpers/SteinbachChanelStrip/CMakeFiles/edit_cache.dir
+/Users/haukesteinbach/Developer/SteinbachChanelStrip/build_release/vst3_helpers/SteinbachChanelStrip/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,50 @@
+{
+  "Name": "Steinbach Chanel Strip",
+  "Version": "1.0.0",
+  "Factory Info": {
+    "Vendor": "Steinbach Audio",
+    "URL": "",
+    "E-Mail": "",
+    "Flags": {
+      "Unicode": true,
+      "Classes Discardable": false,
+      "Component Non Discardable": false,
+    },
+  },
+  "Classes": [
+    {
+      "CID": "ABCDEF019182FAEB5374626853746373",
+      "Category": "Audio Module Class",
+      "Name": "Steinbach Chanel Strip",
+      "Vendor": "Steinbach Audio",
+      "Version": "1.0.0",
+      "SDKVersion": "VST 3.8.0",
+      "Sub Categories": [
+        "Fx",
+        "EQ",
+        "Dynamics",
+      ],
+      "Class Flags": 0,
+      "Cardinality": 2147483647,
+      "Snapshots": [
+      ],
+    },
+    {
+      "CID": "ABCDEF011234ABCD5374626853746373",
+      "Category": "Component Controller Class",
+      "Name": "Steinbach Chanel Strip",
+      "Vendor": "Steinbach Audio",
+      "Version": "1.0.0",
+      "SDKVersion": "VST 3.8.0",
+      "Sub Categories": [
+        "Fx",
+        "EQ",
+        "Dynamics",
+      ],
+      "Class Flags": 0,
+      "Cardinality": 2147483647,
+      "Snapshots": [
+      ],
+    },
+  ],
+}

@@ -75,7 +75,8 @@ SteinbachChanelStripAudioProcessor::createParameterLayout()
     // false = Hard clip, true = Neve-style soft clip (always active, max −4 dB)
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::CLIPPER_MODE, "Soft Clip", false));
-
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::BINAURAL_PAN, "Binaural Pan", false));
     return {params.begin(), params.end()};
 }
 
@@ -171,6 +172,27 @@ void SteinbachChanelStripAudioProcessor::prepareToPlay(double sampleRate, int sa
     smoothPreamp.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(initPreDb));
     smoothPanL.setCurrentAndTargetValue(std::cos((initPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi));
     smoothPanR.setCurrentAndTargetValue(std::sin((initPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi));
+    // Binaural DelayLines (native Samplerate; max ITD ~29 Sa. @ 44.1 kHz → 64 Sa. Puffer)
+    {
+        juce::dsp::ProcessSpec binSpec;
+        binSpec.sampleRate = sampleRate;
+        binSpec.maximumBlockSize = static_cast<uint32_t>(samplesPerBlock);
+        binSpec.numChannels = 1;
+        binDelayL.setMaximumDelayInSamples(64);
+        binDelayL.prepare(binSpec);
+        binDelayL.reset();
+        binDelayR.setMaximumDelayInSamples(64);
+        binDelayR.prepare(binSpec);
+        binDelayR.reset();
+    }
+    binDelaySmL.reset(sampleRate, 0.010);
+    binDelaySmL.setCurrentAndTargetValue(0.0f);
+    binDelaySmR.reset(sampleRate, 0.010);
+    binDelaySmR.setCurrentAndTargetValue(0.0f);
+    binGainSmL.reset(sampleRate, 0.010);
+    binGainSmL.setCurrentAndTargetValue(0.70711f);
+    binGainSmR.reset(sampleRate, 0.010);
+    binGainSmR.setCurrentAndTargetValue(0.70711f);
 }
 
 void SteinbachChanelStripAudioProcessor::releaseResources() {}
@@ -216,6 +238,7 @@ void SteinbachChanelStripAudioProcessor::processBlock(
     const bool consoleOn = *apvts.getRawParameterValue(ParamID::CONSOLE_ENABLE) > 0.5f;
     const int consoleGroup = static_cast<int>(*apvts.getRawParameterValue(ParamID::CONSOLE_GROUP));
     const bool clipSoft = *apvts.getRawParameterValue(ParamID::CLIPPER_MODE) > 0.5f;
+    const bool binauralEnabled = *apvts.getRawParameterValue(ParamID::BINAURAL_PAN) > 0.5f;
 
     // ── EQ ───────────────────────────────────────────────────────────────────
     // ── Shared-Memory: Parameter veroeffentlichen + Console-Override lesen ──────
@@ -396,8 +419,12 @@ void SteinbachChanelStripAudioProcessor::processBlock(
         for (int n = 0; n < numOSSamples; ++n)
         {
             const float curPreamp = smoothPreamp.getNextValue();
-            const float curPanL = smoothPanL.getNextValue();
-            const float curPanR = smoothPanR.getNextValue();
+            const float sPanL = smoothPanL.getNextValue();
+            const float sPanR = smoothPanR.getNextValue();
+            // Bei Binaural: OS-Loop auf Mitte (0.707), das eigentliche Panning
+            // übernimmt der Binaural-Block nach dem Downsampling.
+            const float curPanL = binauralEnabled ? 0.70711f : sPanL;
+            const float curPanR = binauralEnabled ? 0.70711f : sPanR;
 
             const float inL = osL[n] * curPreamp;
             const float inR = osR[n] * curPreamp;
@@ -445,8 +472,32 @@ void SteinbachChanelStripAudioProcessor::processBlock(
             chR[n] = clip(chR[n]);
         }
     }
-    // ── Console Mode: eigenen RMS schreiben (nach Downsample) ────────────────
-    if (consoleOn && instanceSlot >= 0)
+    // ── Console Mode: eigenen RMS schreiben (nach Downsample) ────────────────    // ── Binaural Pan (ITD + ILD, Woodworth-Modell) ─────────────────────────────────
+    if (binauralEnabled)
+    {
+        // Woodworth Spherical Head Model:
+        //   Kopfradius r = 87.5 mm, Schallgeschwindigkeit c = 343 m/s
+        //   ITD(theta) = r/c * (theta + sin(theta))   [theta in ±π/2]
+        const float theta = pan * juce::MathConstants<float>::halfPi;
+        const float itdSamp = (0.0875f / 343.0f) * (theta + std::sin(theta)) * static_cast<float>(getSampleRate());
+
+        binDelaySmL.setTargetValue(std::max(0.0f, itdSamp));  // links verzögert bei pan>0
+        binDelaySmR.setTargetValue(std::max(0.0f, -itdSamp)); // rechts verzögert bei pan<0
+        binGainSmL.setTargetValue(std::cos((pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi));
+        binGainSmR.setTargetValue(std::sin((pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi));
+
+        float *chL = buffer.getWritePointer(0);
+        float *chR = buffer.getWritePointer(1);
+        for (int n = 0; n < numSamples; ++n)
+        {
+            binDelayL.pushSample(0, chL[n]);
+            binDelayR.pushSample(0, chR[n]);
+            chL[n] = binDelayL.popSample(0, binDelaySmL.getNextValue()) * binGainSmL.getNextValue();
+            chR[n] = binDelayR.popSample(0, binDelaySmR.getNextValue()) * binGainSmR.getNextValue();
+        }
+    }
+
+    // ── Console Mode: eigenen RMS schreiben (nach Downsample) ────────────────────    if (consoleOn && instanceSlot >= 0)
     {
         const float rmsL = computeRMS(buffer.getReadPointer(0), numSamples);
         const float rmsR = computeRMS(buffer.getReadPointer(1), numSamples);
