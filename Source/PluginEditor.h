@@ -8,19 +8,19 @@ class SteinbachChanelStripAudioProcessorEditor
       private juce::Timer
 {
 public:
-    explicit SteinbachChanelStripAudioProcessorEditor(SteinbachChanelStripAudioProcessor&);
+    explicit SteinbachChanelStripAudioProcessorEditor(SteinbachChanelStripAudioProcessor &);
     ~SteinbachChanelStripAudioProcessorEditor() override;
 
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics &) override;
     void resized() override;
 
 private:
-    using APVTS        = juce::AudioProcessorValueTreeState;
+    using APVTS = juce::AudioProcessorValueTreeState;
     using SliderAttach = APVTS::SliderAttachment;
     using ButtonAttach = APVTS::ButtonAttachment;
-    using ComboAttach  = APVTS::ComboBoxAttachment;
+    using ComboAttach = APVTS::ComboBoxAttachment;
 
-    SteinbachChanelStripAudioProcessor& audioProcessor;
+    SteinbachChanelStripAudioProcessor &audioProcessor;
 
     // ── EQ ───────────────────────────────────────────────────────────────────
     juce::Slider eqLowKnob, eqMidKnob, eqHighKnob;
@@ -45,12 +45,14 @@ private:
     std::unique_ptr<ButtonAttach> consoleModeAttach;
     juce::ComboBox consoleGroupCombo;
     std::unique_ptr<ComboAttach> consoleGroupAttach;
-
+    // ── Output Clipper ────────────────────────────────────────────────
+    juce::ToggleButton clipperModeButton;
+    std::unique_ptr<ButtonAttach> clipperModeAttach;
     // ── Channel Name label (double-click to rename) ───────────────────────────
     juce::Label channelNameLabel;
 
-    void initKnob(juce::Slider& s, const juce::String& tooltip);
-    void timerCallback() override;  // polls channel name from processor
+    void initKnob(juce::Slider &s, const juce::String &tooltip);
+    void timerCallback() override; // polls channel name from processor
 
     std::unique_ptr<juce::LookAndFeel_V4> laf;
 
