@@ -74,6 +74,10 @@ jobs:
           New-Item -ItemType Directory -Force $dst
           Copy-Item -Recurse "$src\*" "$dst\"
 
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis --no-progress -y
+
       - name: Build NSIS installer
         if: runner.os == 'Windows'
         run: makensis /DVERSION=${{ env.PLUGIN_VERSION }} installer\SteinbachChanelStrip.nsi
