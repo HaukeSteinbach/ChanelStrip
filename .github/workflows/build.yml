@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+env:
+  PLUGIN_VERSION: "1.0.1"
+
 jobs:
   build:
     name: Build (${{ matrix.os }})
@@ -59,4 +62,26 @@ jobs:
         with:
           name: SteinbachConsole-Windows-VST3
           path: build/SteinbachConsole_artefacts/Release/VST3
+          if-no-files-found: error
+
+      # ── Windows NSIS Installer ──────────────────────────────────────────────
+      - name: Stage VST3 for installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $src = "build\SteinbachChanelStrip_artefacts\Release\VST3\Steinbach Chanel Strip.vst3"
+          $dst = "installer\stage\Steinbach Chanel Strip.vst3"
+          New-Item -ItemType Directory -Force $dst
+          Copy-Item -Recurse "$src\*" "$dst\"
+
+      - name: Build NSIS installer
+        if: runner.os == 'Windows'
+        run: makensis /DVERSION=${{ env.PLUGIN_VERSION }} installer\SteinbachChanelStrip.nsi
+
+      - name: Upload Windows Installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SteinbachChanelStrip-Windows-Installer
+          path: SteinbachChanelStrip-${{ env.PLUGIN_VERSION }}-Setup.exe
           if-no-files-found: error
