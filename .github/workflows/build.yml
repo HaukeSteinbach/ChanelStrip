@@ -69,10 +69,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Leerzeichen im Bundlenamen vermeiden (NSIS behandelt sonst .vst3 als Datei-Pattern)
           $src = "build\SteinbachChanelStrip_artefacts\Release\VST3\Steinbach Chanel Strip.vst3"
-          New-Item -ItemType Directory -Force installer\stage\vst3bundle
-          Copy-Item -Recurse "$src\*" installer\stage\vst3bundle\
+          $dst = "installer\stage\vst3bundle"
+          Write-Host "Source: $src  (exists: $(Test-Path $src))"
+          New-Item -ItemType Directory -Force $dst | Out-Null
+          # robocopy ist auf Windows zuverlässiger als Copy-Item mit Leerzeichen im Pfad
+          robocopy $src $dst /E /NP /NFL /NDL
+          # robocopy: Exit-Code 0-7 = Erfolg, 8+ = Fehler
+          if ($LASTEXITCODE -ge 8) { Write-Error "robocopy failed ($LASTEXITCODE)"; exit 1 }
+          Write-Host "Staged $((Get-ChildItem -Recurse $dst).Count) items"
 
       - name: Install NSIS
         if: runner.os == 'Windows'
