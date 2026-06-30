@@ -73,11 +73,11 @@ jobs:
           $dst = "installer\stage\vst3bundle"
           Write-Host "Source: $src  (exists: $(Test-Path $src))"
           New-Item -ItemType Directory -Force $dst | Out-Null
-          # robocopy ist auf Windows zuverlässiger als Copy-Item mit Leerzeichen im Pfad
           robocopy $src $dst /E /NP /NFL /NDL
           # robocopy: Exit-Code 0-7 = Erfolg, 8+ = Fehler
           if ($LASTEXITCODE -ge 8) { Write-Error "robocopy failed ($LASTEXITCODE)"; exit 1 }
           Write-Host "Staged $((Get-ChildItem -Recurse $dst).Count) items"
+          exit 0  # robocopy exit 1 = "files copied" – kein Fehler
 
       - name: Install NSIS
         if: runner.os == 'Windows'
