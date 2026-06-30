@@ -38,10 +38,9 @@ Unicode         True
 
 ; ── Install ──────────────────────────────────────────────────────────────────
 Section "VST3 Plugin" SecVST3
-  ; VST3-Bundle als vollständiges Verzeichnis installieren
-  ; (Staging: installer\stage\vst3bundle\Steinbach Chanel Strip.vst3\...)
-  SetOutPath "$COMMONFILES64\VST3"
-  File /r "installer\stage\vst3bundle\*.*"
+  ; SetOutPath auf das .vst3-Bundle-Verzeichnis, dann alle Inhalte rekursiv einspielen
+  SetOutPath "$COMMONFILES64\VST3\${VST3_NAME}"
+  File /r "installer\stage\vst3bundle\${VST3_NAME}\*.*"
 
   ; Deinstallations-Eintrag anlegen
   WriteUninstaller "$INSTDIR\Uninstall_SteinbachChanelStrip.exe"
