@@ -12,10 +12,16 @@ FEATURES
 
 EQ
 - HPF at 40 Hz (on/off)
-- Low Shelf at 100 Hz, +/-12 dB
+- Low Shelf at 100 Hz, +/-12 dB  --  right-click: Sub Left
 - Mid Bell at 1 kHz, +/-12 dB  --  Q scales subtly with gain (Q: 1.0 @ 0 dB → 0.75 @ ±12 dB)
 - High Shelf at 10 kHz, +/-12 dB
 - All EQ parameters smoothed (50 ms ramp) to prevent clicks
+
+Sub Left (right-click the LOW knob)
+- Mirrors the left channel's sub content (< 77 Hz) to the right channel
+- Right channel above 77 Hz remains unchanged
+- 2nd-order Butterworth crossover at 77 Hz
+- Filter runs continuously to prevent clicks on toggle
 
 Preamp / Saturation
 - Gain +/-24 dB with 2x oversampling to suppress aliasing
@@ -63,7 +69,7 @@ PARAMETERS
   Parameter       Range           Default  Description
   --------------- --------------- -------- ----------------------------
   HPF 40 Hz       on / off        on       High-pass filter at 40 Hz
-  Low (100 Hz)    -12 to +12 dB   0        Low shelf
+  Low (100 Hz)    -12 to +12 dB   0        Low shelf (right-click: Sub Left)
   Mid (1 kHz)     -12 to +12 dB   0        Mid bell, Q 1.0→0.75 with gain
   High (10 kHz)   -12 to +12 dB   0        High shelf
   Pan             -1 to +1        0        Stereo pan (right-click: binaural)
@@ -71,6 +77,7 @@ PARAMETERS
   Character       0 to 1          0        Dry/saturated blend
   Soft Clip       on / off        off      Output clipper mode
   Binaural Pan    on / off        off      ITD+ILD binaural panning
+  Sub Left        on / off        off      Mirror L sub (< 77 Hz) to R channel
   Console Mode    on / off        off      Analog console group processing
   Console Group   1 - 4           1        Console instance group
   L/R Link        on / off        on       Link L/R analog variation

@@ -39,7 +39,8 @@ private:
     SteinbachChanelStripAudioProcessor &audioProcessor;
 
     // ── EQ ───────────────────────────────────────────────────────────────────
-    juce::Slider eqLowKnob, eqMidKnob, eqHighKnob;
+    PanKnob eqLowKnob;               // Rechtsklick → Sub Left
+    juce::Slider eqMidKnob, eqHighKnob;
     std::unique_ptr<SliderAttach> eqLowAttach, eqMidAttach, eqHighAttach;
     juce::ToggleButton hpfButton;
     std::unique_ptr<ButtonAttach> hpfAttach;
@@ -69,6 +70,7 @@ private:
 
     void initKnob(juce::Slider &s, const juce::String &tooltip);
     void timerCallback() override; // polls channel name from processor
+    void showLowContextMenu();     // Rechtsklick auf LOW-Knob
     void showPanContextMenu();     // Rechtsklick auf PanKnob
 
     std::unique_ptr<juce::LookAndFeel_V4> laf;

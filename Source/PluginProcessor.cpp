@@ -76,8 +76,8 @@ SteinbachChanelStripAudioProcessor::createParameterLayout()
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::CLIPPER_MODE, "Soft Clip", false));
     params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::BINAURAL_PAN, "Binaural Pan", false));
-    return {params.begin(), params.end()};
+        ParamID::BINAURAL_PAN, "Binaural Pan", false));    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::SUB_LEFT, "Sub Left", false));    return {params.begin(), params.end()};
 }
 
 // ── Konstruktor / Destruktor ──────────────────────────────────────────────────
@@ -193,6 +193,12 @@ void SteinbachChanelStripAudioProcessor::prepareToPlay(double sampleRate, int sa
     binGainSmL.setCurrentAndTargetValue(0.70711f);
     binGainSmR.reset(sampleRate, 0.010);
     binGainSmR.setCurrentAndTargetValue(0.70711f);
+
+    // Sub Left Crossover (2nd-order Butterworth @ 77 Hz)
+    subLpfL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, 77.0f);
+    subHpfR.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, 77.0f);
+    subLpfL.reset();
+    subHpfR.reset();
 }
 
 void SteinbachChanelStripAudioProcessor::releaseResources() {}
@@ -494,6 +500,21 @@ void SteinbachChanelStripAudioProcessor::processBlock(
             binDelayR.pushSample(0, chR[n]);
             chL[n] = binDelayL.popSample(0, binDelaySmL.getNextValue()) * binGainSmL.getNextValue();
             chR[n] = binDelayR.popSample(0, binDelaySmR.getNextValue()) * binGainSmR.getNextValue();
+        }
+    }
+
+    // ── Sub Left: Linken Sub (< 77 Hz) auf rechten Kanal spiegeln ────────────────
+    // Filter läuft immer (warmer State, kein Klick beim Einschalten)
+    {
+        const bool subLeftEnabled = *apvts.getRawParameterValue(ParamID::SUB_LEFT) > 0.5f;
+        float *chL = buffer.getWritePointer(0);
+        float *chR = buffer.getWritePointer(1);
+        for (int n = 0; n < numSamples; ++n)
+        {
+            const float subL  = subLpfL.processSample(chL[n]); // Sub des linken Kanals
+            const float highR = subHpfR.processSample(chR[n]); // Hochanteil des rechten Kanals
+            if (subLeftEnabled)
+                chR[n] = highR + subL;
         }
     }
 

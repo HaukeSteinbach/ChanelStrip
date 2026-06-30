@@ -31,6 +31,9 @@ namespace ParamID
 
     // Output Clipper
     static constexpr auto CLIPPER_MODE = "clipper_mode"; // false=hard, true=soft
+
+    // Sub Left: Linken Sub (< 77 Hz) auf rechten Kanal spiegeln
+    static constexpr auto SUB_LEFT = "sub_left";
 }
 
 // ── Processor ─────────────────────────────────────────────────────────────────
@@ -114,8 +117,9 @@ private:
     // Max ITD @ 44.1 kHz: ~29 Samples  →  64 Samples Puffer reicht
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> binDelayL, binDelayR;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> binDelaySmL, binDelaySmR;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> binGainSmL, binGainSmR;
-    // ── Shared parameter block (cross-plugin Console communication) ──────────
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> binGainSmL, binGainSmR;    // ── Sub Left: 2nd-order Butterworth Crossover @ 77 Hz ────────────────────────
+    // LPF → Sub des linken Kanals; HPF → Hochanteil des rechten Kanals
+    juce::dsp::IIR::Filter<float> subLpfL, subHpfR;    // ── Shared parameter block (cross-plugin Console communication) ──────────
     SharedParameterBlock shmBlock;
     int shmChannel{-1};
     juce::String channelName{"CH"};

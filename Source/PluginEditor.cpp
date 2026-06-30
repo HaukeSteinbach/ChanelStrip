@@ -201,6 +201,31 @@ public:
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// showLowContextMenu  (Rechtsklick auf LOW-Knob)
+// ─────────────────────────────────────────────────────────────────────────────
+void SteinbachChanelStripAudioProcessorEditor::showLowContextMenu()
+{
+    const bool isOn = *audioProcessor.apvts.getRawParameterValue(ParamID::SUB_LEFT) > 0.5f;
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Low EQ");
+    menu.addItem(1, "Sub Left  (< 77 Hz  L \u2192 R)", true, isOn);
+
+    menu.showMenuAsync({}, [this](int result)
+    {
+        if (result == 1)
+        {
+            if (auto* p = audioProcessor.apvts.getParameter(ParamID::SUB_LEFT))
+            {
+                p->beginChangeGesture();
+                p->setValueNotifyingHost(p->getValue() > 0.5f ? 0.0f : 1.0f);
+                p->endChangeGesture();
+            }
+        }
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // showPanContextMenu
 // ─────────────────────────────────────────────────────────────────────────────
 void SteinbachChanelStripAudioProcessorEditor::showPanContextMenu()
@@ -247,7 +272,8 @@ SteinbachChanelStripAudioProcessorEditor::SteinbachChanelStripAudioProcessorEdit
     setLookAndFeel(laf.get());
     auto &apvts = p.apvts;
 
-    initKnob(eqLowKnob, "Low Shelf 100 Hz +/-12 dB");
+    initKnob(eqLowKnob, "Low Shelf 100 Hz +/-12 dB  |  Rechtsklick: Sub Left");
+    eqLowKnob.onRightClick = [this]{ showLowContextMenu(); };
     initKnob(eqMidKnob, "Mid Bell 1 kHz +/-12 dB");
     initKnob(eqHighKnob, "High Shelf 10 kHz +/-12 dB");
     eqLowAttach = std::make_unique<SliderAttach>(apvts, ParamID::EQ_LOW, eqLowKnob);
@@ -336,7 +362,7 @@ void SteinbachChanelStripAudioProcessorEditor::paint(juce::Graphics &g)
     g.fillAll(kBG);
 
     // ── Title (2-row: top=STEINBACH, bottom=CHANNEL STRIP v1.0) ──────────────────────
-    g.setColour(kText);
+    g.setColour(juce::Colour(0xfffd2e5cu));
     g.setFont(juce::Font(13.0f, juce::Font::bold));
     g.drawText("STEINBACH", 14, 2, 140, 16, juce::Justification::centredLeft);
     g.setColour(kSubText.brighter(0.2f));
