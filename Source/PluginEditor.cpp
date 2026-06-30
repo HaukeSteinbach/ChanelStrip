@@ -341,7 +341,7 @@ void SteinbachChanelStripAudioProcessorEditor::paint(juce::Graphics &g)
     g.drawText("STEINBACH", 14, 2, 140, 16, juce::Justification::centredLeft);
     g.setColour(kSubText.brighter(0.2f));
     g.setFont(juce::Font(10.0f));
-    g.drawText("CHANNEL STRIP  v1.0", 14, 19, 180, 13, juce::Justification::centredLeft);
+    g.drawText("CHANNEL STRIP  v1.0.1", 14, 19, 180, 13, juce::Justification::centredLeft);
 
     // Thin divider
     g.setColour(kBorder);

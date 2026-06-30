@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR"
 BUILD_DIR="$PROJECT_DIR/build_release"
-VERSION="1.0.0"
+VERSION="1.0.1"
 PLUGIN_NAME="Steinbach Chanel Strip"
 IDENTIFIER_BASE="com.steinbach.chanelstrip"
 DESKTOP="$HOME/Desktop"

@@ -1,5 +1,5 @@
 # ninja log v7
-1	848	1782659347089963524	CMakeFiles/vst3_helper.dir/Users/haukesteinbach/Developer/SteinbachChanelStrip/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.o	53795040c488e9e9
-850	968	1782659347938403055	vst3_helper	d0996a704a0f709c
 6	1254	1782660381219298881	CMakeFiles/vst3_helper.dir/Users/haukesteinbach/Developer/SteinbachChanelStrip/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.o	97c37e1fd2e3d45a
 1254	1482	1782660382467231475	vst3_helper	d0996a704a0f709c
+4	1424	1782819561510556377	CMakeFiles/vst3_helper.dir/Users/haukesteinbach/Developer/SteinbachChanelStrip/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.o	fb1b2b12d3f99ad0
+1425	1772	1782819562931122218	vst3_helper	d0996a704a0f709c

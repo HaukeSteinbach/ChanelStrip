@@ -1,4 +1,4 @@
-Steinbach Chanel Strip  v1.0.0
+Steinbach Chanel Strip  v1.0.1
 
 A channel strip audio plugin (VST3 / AU / Standalone) built with JUCE.
 Developed by Hauke Steinbach.
@@ -13,7 +13,7 @@ FEATURES
 EQ
 - HPF at 40 Hz (on/off)
 - Low Shelf at 100 Hz, +/-12 dB
-- Mid Bell at 1 kHz, +/-12 dB  --  Q scales with gain (more gain = wider)
+- Mid Bell at 1 kHz, +/-12 dB  --  Q scales subtly with gain (Q: 1.0 @ 0 dB → 0.75 @ ±12 dB)
 - High Shelf at 10 kHz, +/-12 dB
 - All EQ parameters smoothed (50 ms ramp) to prevent clicks
 
@@ -47,7 +47,7 @@ Analog Console Mode
 
 INSTALLATION (macOS)
 
-Run: SteinbachChanelStrip-1.0.0.pkg
+Run: SteinbachChanelStrip-1.0.1.pkg
 
 Installs to:
   VST3  ->  /Library/Audio/Plug-Ins/VST3/
@@ -64,7 +64,7 @@ PARAMETERS
   --------------- --------------- -------- ----------------------------
   HPF 40 Hz       on / off        on       High-pass filter at 40 Hz
   Low (100 Hz)    -12 to +12 dB   0        Low shelf
-  Mid (1 kHz)     -12 to +12 dB   0        Mid bell, Q scales with gain
+  Mid (1 kHz)     -12 to +12 dB   0        Mid bell, Q 1.0→0.75 with gain
   High (10 kHz)   -12 to +12 dB   0        High shelf
   Pan             -1 to +1        0        Stereo pan (right-click: binaural)
   Preamp Gain     -24 to +24 dB   0        Input gain before saturation

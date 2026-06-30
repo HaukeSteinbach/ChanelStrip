@@ -92,8 +92,8 @@ void EQProcessor::rebuildCoefficients()
         sr, 100.0f, 0.7071f, juce::Decibels::decibelsToGain(pLowGain));
     *lowShelf[1].coefficients = *lowShelf[0].coefficients;
 
-    // Q sinkt linear mit dem Betrag des Gains: 1.0 bei 0 dB → 0.5 bei ±12 dB
-    const float midQ = 1.0f - std::abs(pMidGain) * (0.5f / 12.0f);
+    // Q sinkt linear mit dem Betrag des Gains: 1.0 bei 0 dB → 0.75 bei ±12 dB
+    const float midQ = 1.0f - std::abs(pMidGain) * (0.25f / 12.0f);
 
     *midBell[0].coefficients = *juce::dsp::IIR::Coefficients<float>::makePeakFilter(
         sr, 1000.0f, midQ, juce::Decibels::decibelsToGain(pMidGain));

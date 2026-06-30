@@ -1,6 +1,6 @@
 {
   "Name": "Steinbach Chanel Strip",
-  "Version": "1.0.0",
+  "Version": "1.0.1",
   "Factory Info": {
     "Vendor": "Steinbach Audio",
     "URL": "",
@@ -17,7 +17,7 @@
       "Category": "Audio Module Class",
       "Name": "Steinbach Chanel Strip",
       "Vendor": "Steinbach Audio",
-      "Version": "1.0.0",
+      "Version": "1.0.1",
       "SDKVersion": "VST 3.8.0",
       "Sub Categories": [
         "Fx",
@@ -34,7 +34,7 @@
       "Category": "Component Controller Class",
       "Name": "Steinbach Chanel Strip",
       "Vendor": "Steinbach Audio",
-      "Version": "1.0.0",
+      "Version": "1.0.1",
       "SDKVersion": "VST 3.8.0",
       "Sub Categories": [
         "Fx",
