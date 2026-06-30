@@ -70,14 +70,12 @@ jobs:
         shell: pwsh
         run: |
           $src = "build\SteinbachChanelStrip_artefacts\Release\VST3\Steinbach Chanel Strip.vst3"
-          $dst = "installer\stage\vst3bundle"
-          Write-Host "Source: $src  (exists: $(Test-Path $src))"
-          New-Item -ItemType Directory -Force $dst | Out-Null
-          robocopy $src $dst /E /NP /NFL /NDL
-          # robocopy: Exit-Code 0-7 = Erfolg, 8+ = Fehler
-          if ($LASTEXITCODE -ge 8) { Write-Error "robocopy failed ($LASTEXITCODE)"; exit 1 }
-          Write-Host "Staged $((Get-ChildItem -Recurse $dst).Count) items"
-          exit 0  # robocopy exit 1 = "files copied" – kein Fehler
+          $dst = "installer\stage\vst3bundle\Steinbach Chanel Strip.vst3"
+          if (!(Test-Path $src)) { throw "Missing source bundle: $src" }
+          New-Item -ItemType Directory -Force "installer\stage\vst3bundle" | Out-Null
+          Copy-Item -Path $src -Destination $dst -Recurse -Force
+          if (!(Test-Path $dst)) { throw "Staging failed: $dst not found" }
+          Write-Host "Staged bundle at $dst"
 
       - name: Install NSIS
         if: runner.os == 'Windows'

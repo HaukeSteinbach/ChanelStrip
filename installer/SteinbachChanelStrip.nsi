@@ -38,9 +38,9 @@ Unicode         True
 
 ; ── Install ──────────────────────────────────────────────────────────────────
 Section "VST3 Plugin" SecVST3
-  ; VST3-Bundle in den Standard-VST3-Ordner installieren
-  ; (Staging-Pfad ohne Leerzeichen, NSIS erkennt Verzeichnis zuverlässig)
-  SetOutPath "${VST3_TARGET}"
+  ; VST3-Bundle als vollständiges Verzeichnis installieren
+  ; (Staging: installer\stage\vst3bundle\Steinbach Chanel Strip.vst3\...)
+  SetOutPath "$COMMONFILES64\VST3"
   File /r "installer\stage\vst3bundle\*.*"
 
   ; Deinstallations-Eintrag anlegen
