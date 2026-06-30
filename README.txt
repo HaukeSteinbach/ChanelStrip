@@ -1,6 +1,6 @@
 Steinbach Chanel Strip  v1.0.1
 
-A channel strip audio plugin (VST3 / AU / Standalone) built with JUCE.
+A channel strip audio plugin (VST3 / AU) built with JUCE.
 Developed by Hauke Steinbach.
 
 mail@haukesteinbach.de
