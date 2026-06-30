@@ -69,10 +69,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Leerzeichen im Bundlenamen vermeiden (NSIS behandelt sonst .vst3 als Datei-Pattern)
           $src = "build\SteinbachChanelStrip_artefacts\Release\VST3\Steinbach Chanel Strip.vst3"
-          $dst = "installer\stage\Steinbach Chanel Strip.vst3"
-          New-Item -ItemType Directory -Force $dst
-          Copy-Item -Recurse "$src\*" "$dst\"
+          New-Item -ItemType Directory -Force installer\stage\vst3bundle
+          Copy-Item -Recurse "$src\*" installer\stage\vst3bundle\
 
       - name: Install NSIS
         if: runner.os == 'Windows'

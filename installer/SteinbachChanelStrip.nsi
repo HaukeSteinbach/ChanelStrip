@@ -39,8 +39,9 @@ Unicode         True
 ; ── Install ──────────────────────────────────────────────────────────────────
 Section "VST3 Plugin" SecVST3
   ; VST3-Bundle in den Standard-VST3-Ordner installieren
+  ; (Staging-Pfad ohne Leerzeichen, NSIS erkennt Verzeichnis zuverlässig)
   SetOutPath "${VST3_TARGET}"
-  File /r "installer\stage\${VST3_NAME}"
+  File /r "installer\stage\vst3bundle"
 
   ; Deinstallations-Eintrag anlegen
   WriteUninstaller "$INSTDIR\Uninstall_SteinbachChanelStrip.exe"
